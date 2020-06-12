@@ -187,6 +187,10 @@ ADSingleVariableReturnMappingSolution::internalSolve(const ADReal effective_tria
     scalar_increment = -_residual / computeDerivative(effective_trial_stress, scalar);
     scalar = scalar_old + scalar_increment;
 
+    /// Inner NR loop needs to update other internal state variables for cases when
+    /// the flow rule is a function of these variables
+    updateInternalStateVariables(effective_trial_stress, scalar, scalar_increment);
+
     if (_check_range)
       checkPermissibleRange(scalar,
                             scalar_increment,

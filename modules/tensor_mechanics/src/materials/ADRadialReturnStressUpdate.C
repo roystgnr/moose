@@ -85,6 +85,8 @@ ADRadialReturnStressUpdate::updateState(ADRankTwoTensor & strain_increment,
   if (!MooseUtils::absoluteFuzzyEqual(effective_trial_stress, 0.0))
   {
     returnMappingSolve(effective_trial_stress, scalar_effective_inelastic_strain, _console);
+    // if (_qp==0)
+    //   std::cout<<effective_trial_stress.value()<<" "<<scalar_effective_inelastic_strain.value()<<std::endl;
     if (scalar_effective_inelastic_strain != 0.0)
       inelastic_strain_increment =
           deviatoric_trial_stress *
@@ -105,6 +107,9 @@ ADRadialReturnStressUpdate::updateState(ADRankTwoTensor & strain_increment,
     // to be isotropic and this method natively allows for changing in time
     // elasticity tensors
     stress_new = elasticity_tensor * (elastic_strain_old + strain_increment);
+
+    // if (_qp==0)
+    //   std::cout<<stress_new.L2norm().value()<<" "<<strain_increment.L2norm().value()<<" "<<inelastic_strain_increment.L2norm().value()<<std::endl;
   }
 
   computeStressFinalize(inelastic_strain_increment);
