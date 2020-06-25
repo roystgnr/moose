@@ -10,6 +10,7 @@
 #pragma once
 
 #include "ADRadialReturnStressUpdate.h"
+#include "LinearInterpolation.h"
 
 /**
  * This class uses the stress update material in a radial return isotropic creep
@@ -36,8 +37,11 @@ protected:
   virtual ADReal computeDerivative(const ADReal & effective_trial_stress,
                                    const ADReal & scalar) override;
 
-  void computeFlowRule(const ADReal & effective_trial_stress,
+  void computePlasticStrainRate(const ADReal & effective_trial_stress,
                          const ADReal & scalar = 0.0);
+
+  void computeMisorientationVariable();
+  void computeShearStressDerivative(const ADRankFourTensor & elasticity_tensor);
 
   virtual void updateInternalStateVariables(const ADReal & effective_trial_stress,
                                             const ADReal & scalar=0.0,
@@ -56,7 +60,7 @@ protected:
   const Real _start_time;
 
   ///
-  /// Rate and temperature dependent plasticity model parameters
+  /// Plasticity model parameters
   ///
 
   /// Rate independent yield constant [Pa]
@@ -86,25 +90,33 @@ protected:
   /// Misorientation variable hardening constant [m/(s Pa)]
   const Real _hxi;
 
+  /// Misorientation variable hardening exponent [-]
+  const Real _r;
 
   /// Components for computing the derivatives
   ADReal _C1, _C2;
 
-  /// Flow rule function
-  ADReal _phi;
+  /// Misorientation variable
+  ADReal _xi_bar;
 
-  /// Isotropic harderning internal state variable
-  ADReal _r, _r_old, _dr;
+  /// Plastic strain rate (flow rule function)
+  ADReal _plastic_strain_rate;
 
   /// Temperature dependent yield stress
-  ADReal _Y;
+  ADReal _yield_stress;
 
   /// Temperature dependent shear modulus
-  ADReal _G;
+  ADReal _shear_modulus;
 
-  /// Derivative of temperature dependent shear modulus
-  ADReal _dG;
+  /// Derivative of shear modulus w.r.t. temperature
+  ADReal _shear_modulus_derivative;
 
+  /// LinearInterpolation objects for Young's modulus and Poisson's ratio
+  std::unique_ptr<LinearInterpolation> _data_youngs_modulus, _data_poissons_ratio;
+
+  /// Isotropic harderning internal state variable
+  ADMaterialProperty<Real> & _hardening_variable;
+  const MaterialProperty<Real> & _hardening_variable_old;
 
   /// Plastic strain material property
   ADMaterialProperty<RankTwoTensor> & _plastic_strain;
