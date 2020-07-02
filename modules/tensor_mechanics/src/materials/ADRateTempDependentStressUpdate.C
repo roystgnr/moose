@@ -34,6 +34,12 @@ ADRateTempDependentStressUpdate::validParams()
 
   // Rate dependent plasticity parameters
   // Default values are from the paper by Michael E. Stender, et. al, 2018.
+  // fluid parameters
+  params.addParam<Real>("theta_melt", 1700, "Melt temperature [K]");
+  params.addParam<Real>("mu_melt", 1.0e-6, "Melt viscosity [Pa*s]");
+  params.addParam<Real>("K_melt", 2.2e9, "Bulk modulus melt [Pa]");
+
+  // solid parameters
   params.addParam<Real>("Y0", 5.264e09, "Rate independent yield constant [Pa]");
   params.addParam<Real>("Y1", 2.688e05, "First rate independent yield temperature dependency [K]");
   params.addParam<Real>("Y2", 1.87e-03, "Second rate independent yield temperature dependency [1/K]");
@@ -48,8 +54,7 @@ ADRateTempDependentStressUpdate::validParams()
   params.addParam<Real>("Rd2", 5.419e03, "Isotropic dynamic recovery temperature dependence [K]");
   params.addParam<Real>("hxi", 1.670e-03, " Misorientation variable hardening constant [m/(s Pa)]");
   params.addParam<Real>("r", 1.0, " Misorientation variable hardening exponent [-]");
-  // params.addParam<MaterialPropertyName>("shear_modulus",
-  //                                               "Name of material defining the Shear Modulus");
+
   return params;
 }
 
@@ -57,6 +62,9 @@ ADRateTempDependentStressUpdate::ADRateTempDependentStressUpdate(const InputPara
   : ADRadialReturnStressUpdate(parameters),
     _temperature(isParamValid("temperature") ? &adCoupledValue("temperature") : nullptr),
     _start_time(getParam<Real>("start_time")),
+    _theta_melt(getParam<Real>("theta_melt")),
+    _mu_melt(getParam<Real>("mu_melt")),
+    _K_melt(getParam<Real>("K_melt")),
     _Y0(getParam<Real>("Y0")),
     _Y1(getParam<Real>("Y1")),
     _Y2(getParam<Real>("Y2")),
@@ -74,8 +82,13 @@ ADRateTempDependentStressUpdate::ADRateTempDependentStressUpdate(const InputPara
     _hardening_variable(declareADProperty<Real>(_base_name + "hardening_variable")),
     _hardening_variable_old(getMaterialPropertyOld<Real>(_base_name + "hardening_variable")),
     _plastic_strain(declareADProperty<RankTwoTensor>(_base_name + "plastic_strain")),
-    _plastic_strain_old(getMaterialPropertyOld<RankTwoTensor>(_base_name + "plastic_strain"))
+    _plastic_strain_old(getMaterialPropertyOld<RankTwoTensor>(_base_name + "plastic_strain")),
+    _pressure(declareADProperty<Real>(_base_name + "pressure")),
+    _pressure_old(getMaterialPropertyOld<Real>(_base_name + "pressure"))
 {
+  // Get linear interpolation of Young's modulus and Poisson'ratio
+  // The goal is to compute _shear_modulus_derivative
+  // Todo: how to get ADMaterialProperty derivative w.r.t coupled variable
   std::vector<Real> Ex, Ey, nux, nuy;
   if (!(parameters.isParamValid("Ex")&& parameters.isParamValid("Ey")&& parameters.isParamValid("nux") && parameters.isParamValid("nuy")))
     mooseError("Both 'x' and 'y' data must be specified for the Young's modulus and the Poisson's ratio. ");
@@ -100,6 +113,7 @@ ADRateTempDependentStressUpdate::computeStressInitialize(const ADReal & effectiv
   computeShearStressDerivative(elasticity_tensor);
 
   _hardening_variable[_qp] = _hardening_variable_old[_qp];
+  _pressure[_qp] = _pressure_old[_qp];
 
   updateInternalStateVariables(effective_trial_stress);
 }
@@ -185,6 +199,7 @@ ADRateTempDependentStressUpdate::propagateQpStatefulProperties()
 {
   _plastic_strain[_qp] = _plastic_strain_old[_qp];
   _hardening_variable[_qp]=_hardening_variable_old[_qp];
+  _pressure[_qp]= _pressure_old[_qp];
 
   propagateQpStatefulPropertiesRadialReturn();
 }
@@ -217,4 +232,49 @@ ADRateTempDependentStressUpdate::updateInternalStateVariables(
   //   std::cout<<"\t\t[qp= "<< _qp<<"], Update: r="<<_hardening_variable[_qp].value()<<", dr= "<<dr.value()<<", Dp= "<<scalar.value()<<std::endl;
 
   computePlasticStrainRate(effective_trial_stress, scalar);
+}
+
+void
+ADRateTempDependentStressUpdate::updateState(ADRankTwoTensor & strain_increment,
+                                        ADRankTwoTensor & inelastic_strain_increment,
+                                        const ADRankTwoTensor & rotation_increment,
+                                        ADRankTwoTensor & stress_new,
+                                        const RankTwoTensor & stress_old,
+                                        const ADRankFourTensor & elasticity_tensor,
+                                        const RankTwoTensor & elastic_strain_old)
+{
+
+
+  // if(_qp==0)
+  // std::cout<<"\t\tT: "<<(*_temperature)[_qp].value()<<"; p: "<< _pressure[_qp].value()<<"; p_old: "<< _pressure_old[_qp]<<"; increment: "<<p_increment.value()<<"; strain increment: "<<strain_increment.trace().value();
+
+
+    // std::cout<<"\tSolid..."<<std::endl;
+    ADRadialReturnStressUpdate::updateState(strain_increment,
+                                            inelastic_strain_increment,
+                                            rotation_increment,
+                                            stress_new,
+                                            stress_old,
+                                            elasticity_tensor,
+                                            elastic_strain_old);
+
+  // accumulate pressure in preparation for calculations after melting
+  ADRankTwoTensor strain_increment_total = strain_increment; //+inelastic_strain_increment;
+
+  if ((*_temperature)[_qp] >= _theta_melt)
+  {
+    ADReal p_increment=_K_melt * strain_increment_total.trace();
+    _pressure[_qp]=_pressure_old[_qp] + p_increment;
+    ADRankTwoTensor strain_increment_rate = 1.0/_dt * strain_increment_total;
+    RankTwoTensor I; I.setToIdentity();
+    stress_new = -_pressure[_qp]*I + 2.0*_mu_melt*strain_increment_rate;
+
+    // if(_qp==0)
+    // {
+    //   // std::cout<<"\tMelt... _dt: "<<_dt<<std::endl;
+    //   // // std::cout<<"\t strain rate yy: "<<strain_increment_rate(1,1).value()<<std::endl;
+    //   // std::cout<<"\t pressure: "<<_pressure[_qp].value()<<std::endl;
+    //   std::cout<<"\t new stress trace: "<<stress_new.trace().value()<<std::endl;
+    // }
+  }
 }
