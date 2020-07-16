@@ -53,7 +53,7 @@ ADRateTempDependentStressUpdate::validParams()
   params.addParam<Real>("Rd1", 8.565e02, "Isotropic dynamic recovery constant [Pa]");
   params.addParam<Real>("Rd2", 5.419e03, "Isotropic dynamic recovery temperature dependence [K]");
   params.addParam<Real>("hxi", 1.670e-03, " Misorientation variable hardening constant [m/(s Pa)]");
-  params.addParam<Real>("r", 1.0, " Misorientation variable hardening exponent [-]");
+  params.addParam<Real>("r", 1.0, " Misorientation variable hardening exponent, 0.5<=r<=1 [-]");
 
   return params;
 }
@@ -81,6 +81,8 @@ ADRateTempDependentStressUpdate::ADRateTempDependentStressUpdate(const InputPara
     _r(getParam<Real>("r")),
     _hardening_variable(declareADProperty<Real>(_base_name + "hardening_variable")),
     _hardening_variable_old(getMaterialPropertyOld<Real>(_base_name + "hardening_variable")),
+    _misorientation_variable(declareADProperty<Real>(_base_name + "misorientation_variable")),
+    _misorientation_variable_old(getMaterialPropertyOld<Real>(_base_name + "misorientation_variable")),
     _plastic_strain(declareADProperty<RankTwoTensor>(_base_name + "plastic_strain")),
     _plastic_strain_old(getMaterialPropertyOld<RankTwoTensor>(_base_name + "plastic_strain")),
     _pressure(declareADProperty<Real>(_base_name + "pressure")),
@@ -113,6 +115,7 @@ ADRateTempDependentStressUpdate::computeStressInitialize(const ADReal & effectiv
   computeShearStressDerivative(elasticity_tensor);
 
   _hardening_variable[_qp] = _hardening_variable_old[_qp];
+  _misorientation_variable[_qp] = _misorientation_variable_old[_qp];
   _pressure[_qp] = _pressure_old[_qp];
 
   updateInternalStateVariables(effective_trial_stress);
@@ -131,10 +134,9 @@ ADRateTempDependentStressUpdate::computeDerivative(const ADReal & effective_tria
                                                const ADReal &  scalar )
 {
   computePlasticStrainRate(effective_trial_stress, scalar);
-  computeMisorientationVariable();
 
   const ADReal theta = (*_temperature)[_qp];
-  const ADReal creep_rate_derivative = _C1*(-3.0*_shear_modulus/(_hardening_variable[_qp] + _yield_stress)) - _C1*_C2*(_Hmu*_shear_modulus*(1.0+_xi_bar/_hardening_variable[_qp]) -_Rd1*std::exp(-_Rd2/theta)*_hardening_variable[_qp]);
+  const ADReal creep_rate_derivative = _C1*(-3.0*_shear_modulus/(_hardening_variable[_qp] + _yield_stress)) - _C1*_C2*(_Hmu*_shear_modulus*(1.0+_misorientation_variable[_qp]/_hardening_variable[_qp]) -_Rd1*std::exp(-_Rd2/theta)*_hardening_variable[_qp]);
   return creep_rate_derivative * _dt - 1.0;
 }
 
@@ -158,12 +160,6 @@ ADRateTempDependentStressUpdate::computePlasticStrainRate(const ADReal & effecti
     _C1=0.0;
     _C2=0.0;
   }
-}
-
-void
-ADRateTempDependentStressUpdate::computeMisorientationVariable()
-{
-  _xi_bar = _hxi*std::pow(_hardening_variable[_qp], _r);
 }
 
 void
@@ -199,6 +195,7 @@ ADRateTempDependentStressUpdate::propagateQpStatefulProperties()
 {
   _plastic_strain[_qp] = _plastic_strain_old[_qp];
   _hardening_variable[_qp]=_hardening_variable_old[_qp];
+  _misorientation_variable[_qp]=_misorientation_variable_old[_qp];
   _pressure[_qp]= _pressure_old[_qp];
 
   propagateQpStatefulPropertiesRadialReturn();
@@ -222,14 +219,23 @@ ADRateTempDependentStressUpdate::updateInternalStateVariables(
 {
   const ADReal theta = (*_temperature)[_qp];
 
-  computeMisorientationVariable();
-
   /// Compute increment of isotropic harderning internal state variable
-  ADReal hardening_variable_increment= _hardening_variable_old[_qp]*(_shear_modulus_derivative/_shear_modulus)+(_Hmu*_shear_modulus*(1.0+_xi_bar/_hardening_variable[_qp])-_Rd1*std::exp(-_Rd2/theta)* _hardening_variable_old[_qp])*scalar;
+  ADReal hardening_variable_increment= _hardening_variable[_qp]*(_shear_modulus_derivative/_shear_modulus)+(_Hmu*_shear_modulus*(1.0+_misorientation_variable[_qp]/_hardening_variable[_qp])-_Rd1*std::exp(-_Rd2/theta)* _hardening_variable[_qp])*scalar;
   _hardening_variable[_qp]=_hardening_variable_old[_qp]+hardening_variable_increment;
 
-  // if (_qp==1)
-  //   std::cout<<"\t\t[qp= "<< _qp<<"], Update: r="<<_hardening_variable[_qp].value()<<", dr= "<<dr.value()<<", Dp= "<<scalar.value()<<std::endl;
+  /// Compute increment of misorientation variable
+  ADReal misorientation_variable_increment;
+  const Real n_power = 1.0 - 1.0/_r;
+  if (n_power<1e-10)
+    misorientation_variable_increment = _misorientation_variable[_qp]*(_shear_modulus_derivative/_shear_modulus) + _hxi*_shear_modulus*std::abs(scalar);
+  else
+  {
+    misorientation_variable_increment = _misorientation_variable[_qp]*(_shear_modulus_derivative/_shear_modulus) + _hxi*_shear_modulus*std::pow(_misorientation_variable[_qp]/_shear_modulus , n_power)*std::abs(scalar);
+  }
+  _misorientation_variable[_qp] = _misorientation_variable_old[_qp] + misorientation_variable_increment;
+
+  // if (_qp==0)
+  //   std::cout<<"\t\t[qp= "<< _qp<<"], Update: r="<<_hardening_variable[_qp].value()<<", dr= "<<hardening_variable_increment.value()<<", xi= "<<_misorientation_variable[_qp].value()<<", dxi= "<<misorientation_variable_increment.value()<<std::endl;
 
   computePlasticStrainRate(effective_trial_stress, scalar);
 }
@@ -261,10 +267,18 @@ ADRateTempDependentStressUpdate::updateState(ADRankTwoTensor & strain_increment,
   // accumulate pressure in preparation for calculations after melting
   ADRankTwoTensor strain_increment_total = strain_increment; //+inelastic_strain_increment;
 
-  if ((*_temperature)[_qp] >= _theta_melt)
+  ADReal p_increment=_K_melt * strain_increment_total.trace();
+  _pressure[_qp]=_pressure_old[_qp] + p_increment;
+
+  // get average temperature
+  ADReal temp = 0;
+  for (unsigned int qp = 0; qp < _qrule->n_points(); ++qp)
+    temp += (*_temperature)[qp];
+
+  temp /= _qrule->n_points();
+
+  if (temp >= _theta_melt)
   {
-    ADReal p_increment=_K_melt * strain_increment_total.trace();
-    _pressure[_qp]=_pressure_old[_qp] + p_increment;
     ADRankTwoTensor strain_increment_rate = 1.0/_dt * strain_increment_total;
     RankTwoTensor I; I.setToIdentity();
     stress_new = -_pressure[_qp]*I + 2.0*_mu_melt*strain_increment_rate;

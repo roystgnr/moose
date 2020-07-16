@@ -129,9 +129,6 @@ protected:
   /// Components for computing the derivatives
   ADReal _C1, _C2;
 
-  /// Misorientation variable
-  ADReal _xi_bar;
-
   /// Plastic strain rate (flow rule function)
   ADReal _plastic_strain_rate;
 
@@ -150,6 +147,10 @@ protected:
   /// Isotropic harderning internal state variable
   ADMaterialProperty<Real> & _hardening_variable;
   const MaterialProperty<Real> & _hardening_variable_old;
+
+  /// Misorientation Variable
+  ADMaterialProperty<Real> & _misorientation_variable;
+  const MaterialProperty<Real> & _misorientation_variable_old;
 
   /// Plastic strain material property
   ADMaterialProperty<RankTwoTensor> & _plastic_strain;
