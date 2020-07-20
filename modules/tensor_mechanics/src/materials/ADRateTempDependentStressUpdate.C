@@ -281,13 +281,13 @@ ADRateTempDependentStressUpdate::updateState(ADRankTwoTensor & strain_increment,
   {
     ADRankTwoTensor strain_increment_rate = 1.0/_dt * strain_increment_total;
     RankTwoTensor I; I.setToIdentity();
-    stress_new = -_pressure[_qp]*I + 2.0*_mu_melt*strain_increment_rate;
+    stress_new = _pressure[_qp]*I + 2.0*_mu_melt*strain_increment_rate.deviatoric();
 
     // if(_qp==0)
     // {
     //   // std::cout<<"\tMelt... _dt: "<<_dt<<std::endl;
     //   // // std::cout<<"\t strain rate yy: "<<strain_increment_rate(1,1).value()<<std::endl;
-    //   // std::cout<<"\t pressure: "<<_pressure[_qp].value()<<std::endl;
+    //   std::cout<<"\t pressure: "<<_pressure[_qp].value()<<std::endl;
     //   std::cout<<"\t new stress trace: "<<stress_new.trace().value()<<std::endl;
     // }
   }
