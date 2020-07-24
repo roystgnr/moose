@@ -71,7 +71,7 @@ protected:
                            const ADRankFourTensor & elasticity_tensor,
                            const RankTwoTensor & elastic_strain_old) override;
 
-  // Real computeReferenceResidual(const ADReal & effective_trial_stress, const ADReal & scalar_effective_inelastic_strain) override;
+  virtual Real computeReferenceResidual(const ADReal & effective_trial_stress, const ADReal & scalar_effective_inelastic_strain) override;
 
   /// Temperature variable value
   const ADVariableValue * _temperature;
@@ -156,7 +156,11 @@ protected:
   ADMaterialProperty<RankTwoTensor> & _plastic_strain;
   const MaterialProperty<RankTwoTensor> & _plastic_strain_old;
 
-  /// Melt material property
+  /// Pressure
   ADMaterialProperty<Real> & _pressure;
   const MaterialProperty<Real> & _pressure_old;
+
+  /// Strain from fluid deformation
+  ADMaterialProperty<RankTwoTensor> & _strain_fluid;
+  const MaterialProperty<RankTwoTensor> & _strain_fluid_old;
 };
