@@ -26,6 +26,11 @@ public:
     return _activated_elem_map;
   };
 
+  const std::vector<dof_id_type> & getNewlyActivatedElements() const
+  {
+    return _newly_activated_elem;
+  };
+
   void initialize() override{};
   void execute() override;
   void threadJoin(const UserObject & /*uo*/) override{};
@@ -33,6 +38,7 @@ public:
 
 protected:
   std::map<dof_id_type, Real> _activated_elem_map;
+  std::vector<dof_id_type> _newly_activated_elem;
   const VariableValue & _temp_aux;
   Real _melt_temperature;
 };
