@@ -66,15 +66,7 @@ ActivateElementTemp::execute()
       Add element to the activate subdomain
     */
     ele->subdomain_id()=_active_subdomain_id;
-    /*
-      Reinit equation systems
-    */
-    _mesh.getMesh().prepare_for_use();
-    _mesh.meshChanged();
-    _fe_problem.es().reinit_solutions();
-    _fe_problem.es().reinit();
-    _fe_problem.es().reinit_systems();
-    _mesh.getMesh().prepare_for_use();
+
 
     // std::cout<<"====>  Neighbor element info:\n";
     // for (auto s : ele->side_index_range())
@@ -98,4 +90,21 @@ void
 ActivateElementTemp::finalize()
 {
   // _communicator.set_union(_activated_elem_map);
+  /*
+    Reinit equation systems
+  */
+  // std::cout<<"check"<<std::endl;
+  // _mesh.getMesh().prepare_for_use();
+  // std::cout<<"check"<<std::endl;
+  // _mesh.meshChanged();
+  // std::cout<<"check"<<std::endl;
+  // _fe_problem.es().reinit_solutions();
+  // std::cout<<"check"<<std::endl;
+  // _fe_problem.es().reinit();
+  // std::cout<<"check"<<std::endl;
+  // _fe_problem.es().reinit_systems();
+  // std::cout<<"check"<<std::endl;
+  // _mesh.getMesh().prepare_for_use();
+  // std::cout<<"check"<<std::endl;
+  _fe_problem.meshChanged();
 }
