@@ -26,12 +26,12 @@ StitchedSubgenerators::validParams()
 
   MooseEnum algorithm("BINARY EXHAUSTIVE", "BINARY");
 
-  params.addRequiredParam<std::vector<std::string>>("inputs", "The input mesh filenames");
+  params.addRequiredParam<std::vector<std::string>>("input_files", "The input mesh filenames");
   params.addParam<bool>(
       "clear_stitched_boundary_ids", true, "Whether or not to clear the stitched boundary IDs");
   params.addRequiredParam<std::vector<std::vector<std::string>>>(
       "stitch_boundaries_pairs",
-      "Pairs of boundaries to be stitched together between the 1st mesh in inputs and each "
+      "Pairs of boundaries to be stitched together between the 1st mesh in input_files and each "
       "consecutive mesh");
   params.addParam<MooseEnum>(
       "algorithm",
@@ -45,7 +45,7 @@ StitchedSubgenerators::validParams()
 
 StitchedSubgenerators::StitchedSubgenerators(const InputParameters & parameters)
   : MeshGenerator(parameters),
-    _input_names(getParam<std::vector<std::string>>("inputs")),
+    _input_filenames(getParam<std::vector<std::string>>("input_files")),
     _clear_stitched_boundary_ids(getParam<bool>("clear_stitched_boundary_ids")),
     _stitch_boundaries_pairs(
         getParam<std::vector<std::vector<std::string>>>("stitch_boundaries_pairs")),
@@ -58,11 +58,11 @@ StitchedSubgenerators::StitchedSubgenerators(const InputParameters & parameters)
   InputParameters filemesh_params = _app.getFactory().getValidParams("FileMeshGenerator");
 
   // Create and add MeshGenerators for the input meshes
-  _mesh_ptrs.reserve(_input_names.size());
+  _mesh_ptrs.reserve(_input_filenames.size());
   int sg_num = 0;
-  for (auto & input_name : _input_names)
+  for (auto & input_filename : _input_filenames)
     {
-      filemesh_params.set<MeshFileName>("file") = input_name;
+      filemesh_params.set<MeshFileName>("file") = input_filename;
 
       const std::string sg_name = sg_name_base + std::to_string(sg_num++);
 
@@ -79,10 +79,10 @@ StitchedSubgenerators::generate()
   std::unique_ptr<ReplicatedMesh> mesh = dynamic_pointer_cast<ReplicatedMesh>(*_mesh_ptrs[0]);
 
   // Reserve spaces for the other meshes (no need to store the first one another time)
-  _meshes.reserve(_input_names.size() - 1);
+  _meshes.reserve(_input_filenames.size() - 1);
 
   // Read in all of the other meshes
-  for (MooseIndex(_input_names) i = 1; i < _input_names.size(); ++i)
+  for (MooseIndex(_input_filenames) i = 1; i < _input_filenames.size(); ++i)
     _meshes.push_back(dynamic_pointer_cast<ReplicatedMesh>(*_mesh_ptrs[i]));
 
   // Stitch all the meshes to the first one

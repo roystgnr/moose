@@ -32,8 +32,8 @@ public:
   std::unique_ptr<MeshBase> generate() override;
 
 protected:
-  /// The mesh generator inputs to read
-  const std::vector<std::string> & _input_names;
+  /// The mesh generator input filenames to read
+  const std::vector<std::string> & _input_filenames;
 
   /// Whether or not to clear (remove) the stitched boundary IDs
   const bool & _clear_stitched_boundary_ids;
