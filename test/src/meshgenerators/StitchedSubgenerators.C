@@ -11,6 +11,7 @@
 
 #include "CastUniquePointer.h"
 #include "MooseUtils.h"
+#include "FileMeshGenerator.h"
 
 #include "libmesh/replicated_mesh.h"
 
@@ -25,7 +26,7 @@ StitchedSubgenerators::validParams()
 
   MooseEnum algorithm("BINARY EXHAUSTIVE", "BINARY");
 
-  params.addRequiredParam<std::vector<MeshGeneratorName>>("inputs", "The input MeshGenerators.");
+  params.addRequiredParam<std::vector<std::string>>("inputs", "The input mesh filenames");
   params.addParam<bool>(
       "clear_stitched_boundary_ids", true, "Whether or not to clear the stitched boundary IDs");
   params.addRequiredParam<std::vector<std::vector<std::string>>>(
@@ -44,16 +45,31 @@ StitchedSubgenerators::validParams()
 
 StitchedSubgenerators::StitchedSubgenerators(const InputParameters & parameters)
   : MeshGenerator(parameters),
-    _input_names(getParam<std::vector<MeshGeneratorName>>("inputs")),
+    _input_names(getParam<std::vector<std::string>>("inputs")),
     _clear_stitched_boundary_ids(getParam<bool>("clear_stitched_boundary_ids")),
     _stitch_boundaries_pairs(
         getParam<std::vector<std::vector<std::string>>>("stitch_boundaries_pairs")),
     _algorithm(parameters.get<MooseEnum>("algorithm"))
 {
-  // Grab the input meshes
+  MooseApp &app = this->getMooseApp();
+  const std::string sg_name_base = "subgenerator_";
+
+  // InputParameters filemesh_params = FileMeshGenerator::validParams();
+  InputParameters filemesh_params = _app.getFactory().getValidParams("FileMeshGenerator");
+
+  // Create and add MeshGenerators for the input meshes
   _mesh_ptrs.reserve(_input_names.size());
+  int sg_num = 0;
   for (auto & input_name : _input_names)
-    _mesh_ptrs.push_back(&getMeshByName(input_name));
+    {
+      filemesh_params.set<MeshFileName>("file") = input_name;
+
+      const std::string sg_name = sg_name_base + std::to_string(sg_num++);
+
+      app.addMeshGenerator("FileMeshGenerator", sg_name, filemesh_params);
+
+      _mesh_ptrs.push_back(&getMeshByName(sg_name));
+    }
 }
 
 std::unique_ptr<MeshBase>

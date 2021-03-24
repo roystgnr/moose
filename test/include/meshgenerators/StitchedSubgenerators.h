@@ -33,7 +33,7 @@ public:
 
 protected:
   /// The mesh generator inputs to read
-  const std::vector<MeshGeneratorName> & _input_names;
+  const std::vector<std::string> & _input_names;
 
   /// Whether or not to clear (remove) the stitched boundary IDs
   const bool & _clear_stitched_boundary_ids;
