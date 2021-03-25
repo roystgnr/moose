@@ -22,34 +22,17 @@ defineLegacyParams(StitchedSubgenerators);
 InputParameters
 StitchedSubgenerators::validParams()
 {
-  InputParameters params = MeshGenerator::validParams();
+  InputParameters params = StitchedMeshGenerator::validParams();
 
-  MooseEnum algorithm("BINARY EXHAUSTIVE", "BINARY");
+  params.makeParamNotRequired<std::vector<MeshGeneratorName>>("inputs");
 
   params.addRequiredParam<std::vector<std::string>>("input_files", "The input mesh filenames");
-  params.addParam<bool>(
-      "clear_stitched_boundary_ids", true, "Whether or not to clear the stitched boundary IDs");
-  params.addRequiredParam<std::vector<std::vector<std::string>>>(
-      "stitch_boundaries_pairs",
-      "Pairs of boundaries to be stitched together between the 1st mesh in input_files and each "
-      "consecutive mesh");
-  params.addParam<MooseEnum>(
-      "algorithm",
-      algorithm,
-      "Control the use of binary search for the nodes of the stitched surfaces.");
-  params.addClassDescription(
-      "Allows multiple mesh files to be stiched together to form a single mesh.");
-
   return params;
 }
 
 StitchedSubgenerators::StitchedSubgenerators(const InputParameters & parameters)
-  : MeshGenerator(parameters),
-    _input_filenames(getParam<std::vector<std::string>>("input_files")),
-    _clear_stitched_boundary_ids(getParam<bool>("clear_stitched_boundary_ids")),
-    _stitch_boundaries_pairs(
-        getParam<std::vector<std::vector<std::string>>>("stitch_boundaries_pairs")),
-    _algorithm(parameters.get<MooseEnum>("algorithm"))
+  : StitchedMeshGenerator(parameters),
+    _input_filenames(getParam<std::vector<std::string>>("input_files"))
 {
   MooseApp &app = this->getMooseApp();
   const std::string sg_name_base = "subgenerator_";
@@ -70,92 +53,4 @@ StitchedSubgenerators::StitchedSubgenerators(const InputParameters & parameters)
 
       _mesh_ptrs.push_back(&getMeshByName(sg_name));
     }
-}
-
-std::unique_ptr<MeshBase>
-StitchedSubgenerators::generate()
-{
-  // We put the first mesh in a local pointer
-  std::unique_ptr<ReplicatedMesh> mesh = dynamic_pointer_cast<ReplicatedMesh>(*_mesh_ptrs[0]);
-
-  // Reserve spaces for the other meshes (no need to store the first one another time)
-  _meshes.reserve(_input_filenames.size() - 1);
-
-  // Read in all of the other meshes
-  for (MooseIndex(_input_filenames) i = 1; i < _input_filenames.size(); ++i)
-    _meshes.push_back(dynamic_pointer_cast<ReplicatedMesh>(*_mesh_ptrs[i]));
-
-  // Stitch all the meshes to the first one
-  for (MooseIndex(_meshes) i = 0; i < _meshes.size(); i++)
-  {
-    auto boundary_pair = _stitch_boundaries_pairs[i];
-
-    boundary_id_type first, second;
-
-    try
-    {
-      first = MooseUtils::convert<boundary_id_type>(boundary_pair[0], true);
-    }
-    catch (...)
-    {
-      first = mesh->get_boundary_info().get_id_by_name(boundary_pair[0]);
-
-      if (first == BoundaryInfo::invalid_id)
-      {
-        std::stringstream error;
-
-        error << "Boundary " << boundary_pair[0] << " doesn't exist on the first mesh in " << name()
-              << "\n";
-        error << "Boundary names that do exist: \n";
-        error << " ID : Name\n";
-
-        auto & sideset_id_name_map = mesh->get_boundary_info().get_sideset_name_map();
-
-        for (auto & ss_name_map_pair : sideset_id_name_map)
-          error << " " << ss_name_map_pair.first << " : " << ss_name_map_pair.second << "\n";
-
-        paramError("stitch_boundaries_pairs", error.str());
-      }
-    }
-
-    try
-    {
-      second = MooseUtils::convert<boundary_id_type>(boundary_pair[1], true);
-    }
-    catch (...)
-    {
-      second = _meshes[i]->get_boundary_info().get_id_by_name(boundary_pair[1]);
-
-      if (second == BoundaryInfo::invalid_id)
-      {
-        _meshes[i]->print_info();
-
-        std::stringstream error;
-
-        error << "Boundary " << boundary_pair[1] << " doesn't exist on mesh " << i + 1 << " in "
-              << name() << "\n";
-        error << "Boundary names that do exist: \n";
-        error << " ID : Name\n";
-
-        auto & sideset_id_name_map = _meshes[i]->get_boundary_info().get_sideset_name_map();
-
-        for (auto & ss_name_map_pair : sideset_id_name_map)
-          error << " " << ss_name_map_pair.first << " : " << ss_name_map_pair.second << "\n";
-
-        paramError("stitch_boundaries_pairs", error.str());
-      }
-    }
-
-    const bool use_binary_search = (_algorithm == "BINARY");
-
-    mesh->stitch_meshes(*_meshes[i],
-                        first,
-                        second,
-                        TOLERANCE,
-                        _clear_stitched_boundary_ids,
-                        /*verbose = */ true,
-                        use_binary_search);
-  }
-
-  return dynamic_pointer_cast<MeshBase>(mesh);
 }
