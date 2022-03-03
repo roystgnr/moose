@@ -41,7 +41,7 @@
     recover = false
     exodus_version = '>=8.0'
 
-    requirement = 'The system shall have the ability to remove spline nodes from IsoGeometric Analysis meshes."
+    requirement = 'The system shall have the ability to remove spline nodes from IsoGeometric Analysis meshes.'
     design = 'meshgenerators/FileMeshGenerator.md'
     issues = '#18768'
   []
