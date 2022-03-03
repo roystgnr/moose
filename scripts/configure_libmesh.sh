@@ -49,6 +49,8 @@ function configure_libmesh()
                --disable-maintainer-mode \
                --enable-petsc-hypre-required \
                --enable-metaphysicl-required \
+               --enable-hdf5 \
+               --enable-hdf5-required \
                --with-cxx-std-min=2014 \
                --without-gdb-command \
                --with-methods="${METHODS}" \
