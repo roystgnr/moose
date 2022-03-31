@@ -38,11 +38,14 @@
   []
 
   [./exodus_iga_nosplines_test]
-    type = 'RunApp'
+    type = XMLDiff
     input = '2d_diffusion_iga_nosplines.i'
     expect_out = 'Solve Converged'
     recover = false
     exodus_version = '>=8.0'
+    max_parallel = 1
+    vtk = true
+    xmldiff = '2d_diffusion_iga_nosplines_out_002.pvtu 2d_diffusion_iga_nosplines_out_002_0.vtu'
 
     requirement = 'The system shall have the ability to remove spline nodes from IsoGeometric Analysis meshes.'
     design = 'meshgenerators/FileMeshGenerator.md'
