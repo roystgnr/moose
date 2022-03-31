@@ -23,11 +23,14 @@
   [../]
 
   [./exodus_iga_test]
-    type = 'RunApp'
+    type = XMLDiff
     input = '2d_diffusion_iga.i'
     expect_out = 'Solve Converged'
     recover = false
     exodus_version = '>=8.0'
+    max_parallel = 1
+    vtk = true
+    xmldiff = '2d_diffusion_iga_out_002.pvtu 2d_diffusion_iga_out_002_0.vtu'
 
     requirement = 'The system shall have the ability to read IsoGeometric Analysis meshes with rational bases in ExodusII format.'
     design = 'meshgenerators/FileMeshGenerator.md'
