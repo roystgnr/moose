@@ -28,13 +28,13 @@ Poly2TriMeshGenerator::validParams()
   MooseEnum algorithm("BINARY EXHAUSTIVE", "BINARY");
 
   params.addRequiredParam<MeshGeneratorName>("boundary", "The MeshGenerator that defines the mesh outer boundary.");
-  params.addParam<unsigned int>("interpolate_boundary", 1, "How many nodes to use per outer boundary segment.");
+  params.addParam<unsigned int>("interpolate_boundary", 0, "How many more nodes to add in each outer boundary segment.");
   params.addParam<bool>("refine_boundary", true, "Whether to allow automatically refining the outer boundary.");
   params.addParam<std::vector<MeshGeneratorName>>("holes", std::vector<MeshGeneratorName>(), "The MeshGenerators that define mesh holes.");
   params.addParam<std::vector<bool>>("stitch_holes", std::vector<bool>(), "Whether to stitch to the mesh defining each hole.");
   params.addParam<std::vector<unsigned int>>("interpolate_holes", std::vector<unsigned int>(), "How many nodes to use per hole boundary segment.");
   params.addParam<std::vector<bool>>("refine_holes", std::vector<bool>(), "Whether to allow automatically refining each hole boundary.");
-  params.addParam<Real>("desired_area", 0, "Desired triangle area.");
+  params.addParam<Real>("desired_area", std::numeric_limits<Real>::max(), "Desired triangle area.");
   params.addParam<std::string>("desired_area_func", std::string(), "Function specifying desired triangle area as a function of x,y.");
   params.addParam<MooseEnum>(
       "algorithm",
@@ -68,9 +68,6 @@ Poly2TriMeshGenerator::generate()
   std::unique_ptr<UnstructuredMesh> mesh =
     dynamic_pointer_cast<UnstructuredMesh>(_bdy_ptr);
 
-  if (_interpolate_bdy < 1)
-    paramError("interpolate_boundary", "Need at least 1 point per boundary segment");
-
   if (!_stitch_holes.empty() && _stitch_holes.size() != _hole_ptrs.size())
     paramError("stitch_holes", "Need one stitch_holes entry per hole, if specified.");
 
@@ -81,6 +78,7 @@ Poly2TriMeshGenerator::generate()
   poly2tri.triangulation_type() = TriangulatorInterface::PSLG;
 
   poly2tri.set_interpolate_boundary_points(_interpolate_bdy);
+  poly2tri.set_refine_boundary_allowed(_refine_bdy);
 
   poly2tri.desired_area() = _desired_area;
   poly2tri.minimum_angle() = 0; // Not yet supported
@@ -92,6 +90,9 @@ Poly2TriMeshGenerator::generate()
       ParsedFunction<Real> area_func { _desired_area_func };
       poly2tri.set_desired_area_function(&area_func);
     }
+
+  if (!_hole_ptrs.empty())
+    libmesh_not_implemented(); // Still working on it
 
   poly2tri.triangulate();
 
