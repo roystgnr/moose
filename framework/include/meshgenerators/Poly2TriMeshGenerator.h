@@ -48,4 +48,6 @@ protected:
 
   /// Type of algorithm used to find matching nodes (binary or exhaustive)
   MooseEnum _algorithm;
+
+  bool _verbose_stitching;
 };
