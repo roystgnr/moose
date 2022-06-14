@@ -43,6 +43,9 @@ Poly2TriMeshGenerator::validParams()
       "Control the use of binary search for the nodes of the stitched surfaces.");
   params.addParam<bool>("verbose_stitching", false, "Whether mesh stitching should have verbose output.");
 
+  params.addClassDescription(
+      "Triangulates meshes within boundaries defined by input meshes.");
+
   return params;
 }
 

@@ -38,6 +38,9 @@ PolyLineMeshGenerator::validParams()
   params.addParam<unsigned int>(
       "num_edges_between_points", 1, "How many Edge elements to build between each point pair");
 
+  params.addClassDescription(
+      "Generates meshes from edges connecting a list of points.");
+
   return params;
 }
 
