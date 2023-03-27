@@ -21,10 +21,30 @@ ComputeResidualFunctor::residual(const NumericVector<Number> & soln,
 {
   libmesh_parallel_only(soln.comm());
 
+  // libMesh never threw any curve balls here before, and now half of
+  // MOOSE seems to break if this identity doesn't hold, so let's have
+  // an assertion here rather than weird segfaults or erroneous
+  // evaluations later.
+  mooseAssert(&soln == sys.current_local_solution.get(),
+              "MOOSE was asked for a residual not at current_local_solution");
+
   if (!_fe_problem.failNextNonlinearConvergenceCheck())
   {
+    // If we allow a residual to depend on constrained DoFs, then
+    // the corresponding true Jacobian doesn't have a proper zero
+    // block for that dependency.
+    std::unique_ptr<NumericVector<Number>> u_unconstrained = soln.clone();
+    sys.get_dof_map().enforce_constraints_exactly(
+        sys, sys.current_local_solution.get(), /* homogeneous */ true);
     _fe_problem.computingNonlinearResid(true);
-    _fe_problem.computeResidualSys(sys, soln, residual);
+    _fe_problem.computeResidualSys(sys, *sys.current_local_solution, residual);
     _fe_problem.computingNonlinearResid(false);
+
+    // Because we've assembled the residual vector from an a priori
+    // unspecified set of subresiduals per element we can't safely add
+    // heterogeneous terms anywhere there.  So we'll apply those terms
+    // once, at the global level.  We need the *unconstrained* soln
+    // here because that's where the constraint mismatches are.
+    sys.get_dof_map().enforce_constraints_on_residual(sys, &residual, u_unconstrained.get());
   }
 }

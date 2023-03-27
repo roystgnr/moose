@@ -3087,7 +3087,13 @@ Assembly::processLocalResidual(DenseVector<Number> & res_block,
       res_block *= scaling_factor[0];
   }
 
-  _dof_map.constrain_element_vector(res_block, dof_indices, false);
+  // Here we're only applying homogeneous constraints, because we
+  // don't want to apply any offset values (e.g. the constraint
+  // equation row residual entries themselves) multiple times in a
+  // residual, lest they not match the application to the Jacobian.
+  // _dof_map.constrain_element_residual(
+  //     res_block, dof_indices, *_sys.system().current_local_solution);
+  _dof_map.constrain_element_vector(res_block, dof_indices);
 }
 
 void
@@ -3497,7 +3503,7 @@ Assembly::addJacobianBlock(SparseMatrix<Number> & jacobian,
       // to constrain the element matrix because it introduces 1s on the diagonal for the
       // constrained dofs
       if (!_sys.computingScalingJacobian())
-        _dof_map.constrain_element_matrix(sub, di, dj, false);
+        _dof_map.constrain_element_matrix(sub, di, dj);
 
       jacobian.add_matrix(sub, di, dj);
     }
@@ -3549,7 +3555,7 @@ Assembly::cacheJacobianBlock(DenseMatrix<Number> & jac_block,
       // to constrain the element matrix because it introduces 1s on the diagonal for the
       // constrained dofs
       if (!_sys.computingScalingJacobian())
-        _dof_map.constrain_element_matrix(sub, di, dj, false);
+        _dof_map.constrain_element_matrix(sub, di, dj);
 
       for (MooseIndex(di) i = 0; i < di.size(); i++)
         for (MooseIndex(dj) j = 0; j < dj.size(); j++)
@@ -3605,7 +3611,7 @@ Assembly::cacheJacobianBlockNonzero(DenseMatrix<Number> & jac_block,
       if (scaling_factor[i] != 1.0)
         sub *= scaling_factor[i];
 
-      _dof_map.constrain_element_matrix(sub, di, dj, false);
+      _dof_map.constrain_element_matrix(sub, di, dj);
 
       for (MooseIndex(di) i = 0; i < di.size(); i++)
         for (MooseIndex(dj) j = 0; j < dj.size(); j++)
@@ -3640,7 +3646,7 @@ Assembly::cacheJacobianBlock(DenseMatrix<Number> & jac_block,
     // constrain the element matrix because it introduces 1s on the diagonal for the constrained
     // dofs
     if (!_sys.computingScalingJacobian())
-      _dof_map.constrain_element_matrix(jac_block, di, dj, false);
+      _dof_map.constrain_element_matrix(jac_block, di, dj);
 
     if (scaling_factor != 1.0)
       jac_block *= scaling_factor;
@@ -4161,7 +4167,7 @@ Assembly::addJacobianBlock(SparseMatrix<Number> & jacobian,
   // constrain the element matrix because it introduces 1s on the diagonal for the constrained
   // dofs
   if (!_sys.computingScalingJacobian())
-    dof_map.constrain_element_matrix(sub, di, dj, false);
+    dof_map.constrain_element_matrix(sub, di, dj);
 
   if (scaling_factor[i] != 1.0)
     sub *= scaling_factor[i];
@@ -4217,7 +4223,7 @@ Assembly::addJacobianBlockNonlocal(SparseMatrix<Number> & jacobian,
   // constrain the element matrix because it introduces 1s on the diagonal for the constrained
   // dofs
   if (!_sys.computingScalingJacobian())
-    dof_map.constrain_element_matrix(sub, di, dj, false);
+    dof_map.constrain_element_matrix(sub, di, dj);
 
   if (scaling_factor[i] != 1.0)
     sub *= scaling_factor[i];
@@ -4275,9 +4281,9 @@ Assembly::addJacobianNeighbor(SparseMatrix<Number> & jacobian,
   // dofs
   if (!_sys.computingScalingJacobian())
   {
-    dof_map.constrain_element_matrix(suben, dc, dn, false);
-    dof_map.constrain_element_matrix(subne, dn, dc, false);
-    dof_map.constrain_element_matrix(subnn, dn, dn, false);
+    dof_map.constrain_element_matrix(suben, dc, dn);
+    dof_map.constrain_element_matrix(subne, dn, dc);
+    dof_map.constrain_element_matrix(subnn, dn, dn);
   }
 
   if (scaling_factor[i] != 1.0)
@@ -4676,6 +4682,13 @@ Assembly::feCurlPhiFaceNeighbor<VectorValue<Real>>(FEType type) const
   _need_curl[type] = true;
   buildVectorFaceNeighborFE(type);
   return _vector_fe_shape_data_face_neighbor[type]->_curl_phi;
+}
+
+void
+Assembly::constrain_element_residual(DenseVector<Number> & element_vector,
+                                     std::vector<dof_id_type> & row_indices)
+{
+  _dof_map.constrain_element_vector(element_vector, row_indices);
 }
 
 void

@@ -113,6 +113,9 @@ NonlinearSystem::NonlinearSystem(FEProblemBase & fe_problem, const std::string &
     petsc_solver->set_residual_zero_out(false);
     petsc_solver->set_jacobian_zero_out(false);
     petsc_solver->use_default_monitor(false);
+
+    // We constrain residuals+Jacobians at the element level now
+    petsc_solver->set_exact_constraint_enforcement(false);
   }
 }
 
