@@ -13,6 +13,7 @@
 #include "MooseArray.h"
 #include "MooseTypes.h"
 #include "MooseVariableFE.h"
+#include "SystemBase.h"
 #include "ArbitraryQuadrature.h"
 
 #include "libmesh/dense_vector.h"
@@ -1766,6 +1767,14 @@ public:
                         Real scaling_factor);
 
   /**
+   * A shim to \p libMesh::DofMap::constrain_element_residual, to let
+   * processResiduals be defined in the header here without requiring
+   * libmesh/system.h to be included.
+   */
+  void constrain_element_residual(DenseVector<Number> & element_vector,
+                                  std::vector<dof_id_type> & row_indices);
+
+  /**
    * Process the value and \p derivatives() data of a vector of \p ADReals. When using global
    * indexing, this method simply caches the value (residual) for the provided \p vector_tags and
    * derivative values (Jacobian) for the corresponding column indices for the provided \p
@@ -2912,10 +2921,7 @@ Assembly::processResiduals(const std::vector<T> & residuals,
   for (const auto i : index_range(row_indices))
     element_vector(i) = MetaPhysicL::raw_value(residuals[i]) * scaling_factor;
 
-  // At time of writing, this method doesn't do anything with the asymmetric_constraint_rows
-  // argument, but we set it to false to be consistent with processLocalResidual
-  _dof_map.constrain_element_vector(
-      element_vector, row_indices, /*asymmetric_constraint_rows=*/false);
+  this->constrain_element_residual(element_vector, row_indices);
 
   for (const auto i : index_range(row_indices))
     cacheResidual(row_indices[i], element_vector(i), vector_tags);
