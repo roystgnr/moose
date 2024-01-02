@@ -54,11 +54,14 @@ private:
                                      const dof_id_type num_modes_compute,
                                      const Real energy) const;
 
+  /// PETSc-3.14.0 or higher is required for using StochasticTools::POD
+#if !PETSC_VERSION_LESS_THAN(3, 14, 0)
   /// The container where the snapshots are stored
   const ParallelSolutionStorage * const _parallel_storage;
   /// Additional options for the singular value solver
   const std::string & _extra_slepc_options;
   /// The communicator for parallel routines
   const Parallel::Communicator & _communicator;
+#endif // !PETSC_VERSION_LESS_THAN(3, 14, 0)
 };
 }

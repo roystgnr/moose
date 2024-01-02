@@ -17,9 +17,11 @@ namespace StochasticTools
 POD::POD(const ParallelSolutionStorage * const parallel_storage,
          const std::string & extra_slepc_options,
          const Parallel::Communicator & comm)
+#if !PETSC_VERSION_LESS_THAN(3, 14, 0)
   : _parallel_storage(parallel_storage),
     _extra_slepc_options(extra_slepc_options),
     _communicator(comm)
+#endif
 {
 #if PETSC_VERSION_LESS_THAN(3, 14, 0)
   mooseError("PETSc-3.14.0 or higher is required for using StochasticTools::POD.");
