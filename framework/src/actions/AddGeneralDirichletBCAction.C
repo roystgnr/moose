@@ -15,7 +15,6 @@
 #include "Function.h"
 #include "InputParameters.h"
 #include "MooseMesh.h"
-#include "NonlinearSystem.h"
 
 #include "libmesh/dirichlet_boundaries.h"
 #include "libmesh/function_base.h"
@@ -26,7 +25,7 @@ namespace
 class FunctionToFunction : public FunctionBase<Number>
 {
 public:
-  FunctionToFunction(Function & f) : _f(&f) { this->_initialized = true; }
+  FunctionToFunction(const Function & f) : _f(&f) { this->_initialized = true; }
 
   // The DirichletBoundary usage only goes through the multi-component output API
   virtual Number operator()(const Point &, const Real = 0)
@@ -47,7 +46,7 @@ public:
   }
 
 private:
-  Function * _f;
+  const Function * _f;
 };
 }
 
@@ -59,12 +58,12 @@ AddGeneralDirichletBCAction::validParams()
   InputParameters params = Action::validParams();
 
   params.addRequiredParam<std::vector<BoundaryName>>(
-      "boundaries", {}, "Names/ids of boundaries on which to enforce the Dirichlet condition");
+      "boundaries", "Names/ids of boundaries on which to enforce the Dirichlet condition");
   params.addRequiredParam<std::vector<VariableName>>(
-      "variables", {}, "Variables for which to apply the Dirichlet condition");
+      "variables", "Variables for which to apply the Dirichlet condition");
 
   params.addRequiredParam<std::vector<FunctionName>>(
-      "functions", {}, "Functions that specify the Dirichlet values for each variable");
+      "functions", "Functions that specify the Dirichlet values for each variable");
 
   params.addClassDescription(
       "Action that adds Dirichlet boundary conditions for general continuous variable types");
@@ -72,7 +71,7 @@ AddGeneralDirichletBCAction::validParams()
 }
 
 AddGeneralDirichletBCAction::AddGeneralDirichletBCAction(const InputParameters & params)
-  : Action(params), _mesh(nullptr)
+  : Action(params)
 {
 }
 
@@ -80,10 +79,12 @@ void
 AddGeneralDirichletBCAction::addDirichletBoundary(System & sys)
 {
   const auto & var_names = getParam<std::vector<VariableName>>("variables");
-  const auto & func_names = getParam<std::vector<VariableName>>("functions");
+  const auto & func_names = getParam<std::vector<FunctionName>>("functions");
 
   auto boundaries = getParam<std::vector<BoundaryName>>("boundaries");
   auto boundary_ids = MooseMeshUtils::getBoundaryIDs(sys.get_mesh(), boundaries, false);
+
+  FunctionInterface fi(_problem.get());
 
   const std::set<boundary_id_type> bcid_set{boundary_ids.begin(), boundary_ids.end()};
 
@@ -96,7 +97,7 @@ AddGeneralDirichletBCAction::addDirichletBoundary(System & sys)
     unsigned int var_num = sys.variable_number(var);
 
     // This goes out of scope but it's okay; libMesh takes its clone()
-    FunctionToFunction f(getFunctionByName(func_names[i]));
+    FunctionToFunction f(fi.getFunctionByName(func_names[i]));
 
     DirichletBoundary d{bcid_set, {var_num}, f};
 
@@ -107,11 +108,7 @@ AddGeneralDirichletBCAction::addDirichletBoundary(System & sys)
 void
 AddGeneralDirichletBCAction::act()
 {
-  auto & nl = _problem->getNonlinearSystemBase(/*nl_sys_num=*/0);
-  _mesh = &_problem->mesh();
   auto displaced_problem = _problem->getDisplacedProblem();
-
-  setPeriodicVars(p, getParam<std::vector<VariableName>>("variable"));
 
   auto & eq = _problem->es();
   for (const auto i : make_range(eq.n_systems()))

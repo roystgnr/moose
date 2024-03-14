@@ -10,6 +10,7 @@
 #pragma once
 
 #include "Action.h"
+#include "FunctionInterface.h"
 
 #include "libmesh/dirichlet_boundaries.h"
 
@@ -31,6 +32,4 @@ public:
 
 protected:
   void addDirichletBoundary(System & s);
-
-  MooseMesh * _mesh;
 };

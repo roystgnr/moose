@@ -190,6 +190,7 @@ addActionTypes(Syntax & syntax)
   registerTask("recover_meta_data", true);
 
   registerTask("add_bounds_vectors", false);
+  registerTask("add_general_dirichlet_bc", false);
   registerTask("add_periodic_bc", false);
   registerTask("add_aux_variable", false);
   registerTask("add_external_aux_variables", true);
@@ -314,7 +315,7 @@ addActionTypes(Syntax & syntax)
                            "(setup_variable_complete)"
                            "(setup_quadrature)"
                            "(add_function)"
-                           "(add_periodic_bc)"
+                           "(add_periodic_bc, add_general_dirichlet_bc)"
                            "(add_user_object)"
                            "(add_distribution)"
                            "(add_sampler)"
@@ -487,6 +488,9 @@ associateSyntaxInner(Syntax & syntax, ActionFactory & /*action_factory*/)
 
   registerSyntaxTask("EmptyAction", "BCs/Periodic", "no_action"); // placeholder
   registerSyntax("AddPeriodicBCAction", "BCs/Periodic/*");
+
+  registerSyntaxTask("EmptyAction", "BCs/GeneralDirichlet", "no_action"); // placeholder
+  registerSyntax("AddGeneralDirichletBCAction", "BCs/GeneralDirichlet/*");
 
   registerSyntaxTask("AddInitialConditionAction", "ICs/*", "add_ic");
   registerSyntaxTask("AddFVInitialConditionAction", "FVICs/*", "add_fv_ic");
