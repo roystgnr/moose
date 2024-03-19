@@ -179,7 +179,7 @@ MultiAppProjectionTransfer::assembleL2(EquationSystems & es, const std::string &
             Ke(i, j) += JxW[qp] * (phi[i][qp] * phi[j][qp]);
           }
       }
-      dof_map.constrain_element_matrix_and_vector(Ke, Fe, dof_indices);
+      dof_map.heterogeneously_constrain_element_matrix_and_vector(Ke, Fe, dof_indices);
 
       if (_compute_matrix)
         system_matrix.add_matrix(Ke, dof_indices);
