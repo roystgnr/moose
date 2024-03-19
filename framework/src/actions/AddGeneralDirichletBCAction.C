@@ -35,6 +35,10 @@ public:
 
   virtual void operator()(const Point & p, const Real t, DenseVector<Number> & output)
   {
+    // We can't clone the underlying function in our clone() method,
+    // so we're left locking it to prevent threading bugs.
+    Threads::spin_mutex::scoped_lock lock(_function_operator_mutex);
+
     output.resize(1);
     output.zero();
     output(0) = _f->value(t, p);
@@ -47,6 +51,8 @@ public:
 
 private:
   const Function * _f;
+
+  Threads::spin_mutex _function_operator_mutex;
 };
 }
 
@@ -84,8 +90,6 @@ AddGeneralDirichletBCAction::addDirichletBoundary(System & sys)
   auto boundaries = getParam<std::vector<BoundaryName>>("boundaries");
   auto boundary_ids = MooseMeshUtils::getBoundaryIDs(sys.get_mesh(), boundaries, false);
 
-  FunctionInterface fi(_problem.get());
-
   const std::set<boundary_id_type> bcid_set{boundary_ids.begin(), boundary_ids.end()};
 
   for (std::size_t i : index_range(var_names))
@@ -96,8 +100,18 @@ AddGeneralDirichletBCAction::addDirichletBoundary(System & sys)
 
     unsigned int var_num = sys.variable_number(var);
 
+    // Get the Function we're asked for.  Non-constant, since we'll
+    // need to do setup for it.
+    Function & fi = _problem->getFunction(func_names[i]);
+
+    // We don't normally setup MOOSE Function objects until *after*
+    // init(), but libMesh System::init() is going to need initialized
+    // functions to evaluate, so we'll set up the ones we need early.
+    for (THREAD_ID tid = 0; tid < libMesh::n_threads(); tid++)
+      fi.initialSetup();
+
     // This goes out of scope but it's okay; libMesh takes its clone()
-    FunctionToFunction f(fi.getFunctionByName(func_names[i]));
+    FunctionToFunction f(fi);
 
     DirichletBoundary d{bcid_set, {var_num}, f};
 
@@ -109,6 +123,19 @@ void
 AddGeneralDirichletBCAction::act()
 {
   auto displaced_problem = _problem->getDisplacedProblem();
+
+  // We'll need scalars to be properly sized early in case any of our
+  // functions are ParsedFunctions, since we're about to do function
+  // initialSetup early too.
+  //
+  // We only need thread 0 data for libMesh init() right now, but
+  // let's try to future-proof a little.
+  for (THREAD_ID tid = 0; tid < libMesh::n_threads(); tid++)
+  {
+    _problem->reinitScalars(tid);
+    if (displaced_problem)
+      displaced_problem->reinitScalars(tid);
+  }
 
   auto & eq = _problem->es();
   for (const auto i : make_range(eq.n_systems()))
