@@ -437,11 +437,12 @@ AdvancedOutput::initAvailableLists()
         if (var.isArray())
           vname = var.arrayVariableComponent(i);
 
-        // A note that if we have p-refinement we assume "worst-case" scenario that our constant
-        // monomial/monomial-vec families have been refined and we can no longer write them as
-        // elemental
-        if (type.order == CONSTANT && !_problem_ptr->havePRefinement() &&
-            type.family != MONOMIAL_VEC)
+        // A note that if we have p-refinement we assume a
+        // "worst-case" scenario, that some elements with eligible
+        // constant monomial/monomial-vec families have been refined
+        // and we can no longer safely write them as elemental
+        if (type.order == CONSTANT && type.family != MONOMIAL_VEC &&
+            (!_problem_ptr->havePRefinement() || !var.dofMap().should_p_refine_var(var.number())))
           _execute_data["elemental"].available.insert(vname);
         else if (FEInterface::field_type(type) == TYPE_VECTOR)
         {
