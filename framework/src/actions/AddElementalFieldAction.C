@@ -34,8 +34,12 @@ AddElementalFieldAction::AddElementalFieldAction(const InputParameters & params)
 void
 AddElementalFieldAction::init()
 {
+  // We want one value per element
   _moose_object_pars.set<MooseEnum>("order") = "CONSTANT";
   _moose_object_pars.set<MooseEnum>("family") = "MONOMIAL";
+
+  // We want one value per element even after any p refinement
+  _moose_object_pars.set<bool>("disable_p_refinement") = true;
 
   _fe_type = libMesh::FEType(CONSTANT, MONOMIAL);
 

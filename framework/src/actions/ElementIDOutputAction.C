@@ -56,6 +56,12 @@ ElementIDOutputAction::act()
         auto var_params = _factory.getValidParams("MooseVariableConstMonomial");
         auto kernel_params = _factory.getValidParams("ExtraElementIDAux");
         kernel_params.set<ExecFlagEnum>("execute_on") = EXEC_INITIAL;
+
+        // These variables are for fixed ids, one DoF per element, not
+        // actual monomials that might have linear or higher
+        // components.
+        var_params.set<bool>("disable_p_refinement") = true;
+
         for (unsigned int i = 0; i < _problem->assembly(0, 0).numExtraElemIntegers(); ++i)
         {
           auto & var_name = _mesh->getMesh().get_elem_integer_name(i);
