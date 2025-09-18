@@ -106,6 +106,16 @@
                   "mesh with the ExodusII format."
   []
 
+  [output_elem_id_without_p]
+    type = 'Exodiff'
+    input = 'exodus_elem_id_without_p.i'
+    exodiff = 'exodus_elem_id_without_p_out.e'
+
+    issues = '#23386'
+    requirement = "The system shall support outputting extra element id data as piecewise constant "
+                  "even on a mesh with p refinement"
+  []
+
   [output_elem_id_restrict]
     type = 'Exodiff'
     input = 'exodus_elem_id.i'
