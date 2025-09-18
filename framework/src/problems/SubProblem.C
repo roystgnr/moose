@@ -1371,14 +1371,15 @@ SubProblem::doingPRefinement() const
 void
 SubProblem::markFamilyPRefinement(const InputParameters & params)
 {
-  auto family = Utility::string_to_enum<FEFamily>(params.get<MooseEnum>("family"));
+  auto family_str = params.get<MooseEnum>("family");
+  auto family = Utility::string_to_enum<FEFamily>(family_str);
   bool flag = _default_families_without_p_refinement.count(family);
   if (params.isParamValid("disable_p_refinement"))
     flag = params.get<bool>("disable_p_refinement");
 
   auto [it, inserted] = _family_for_p_refinement.emplace(family, flag);
   if (!inserted && flag != it->second)
-    mooseError("'disable_p_refinement' not set consistently for variables in ", family);
+    mooseError("'disable_p_refinement' not set consistently for variables in ", family_str);
 }
 
 void
