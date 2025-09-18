@@ -2990,7 +2990,7 @@ FEProblemBase::addVariable(const std::string & var_type,
 
   _solver_var_to_sys_num[var_name] = solver_system_number;
 
-  markFamilyPRefinement(params);
+  markFamilyPRefinement(solver_system_number, params);
 }
 
 std::pair<bool, unsigned int>
@@ -3290,7 +3290,7 @@ FEProblemBase::addAuxVariable(const std::string & var_type,
     // MooseObjects need to be unique so change the name here
     _displaced_problem->addAuxVariable(var_type, var_name, params);
 
-  markFamilyPRefinement(params);
+  markFamilyPRefinement(_aux->number(), params);
 }
 
 void
@@ -3338,7 +3338,7 @@ FEProblemBase::addAuxVariable(const std::string & var_name,
   if (_displaced_problem)
     _displaced_problem->addAuxVariable("MooseVariable", var_name, params);
 
-  markFamilyPRefinement(params);
+  markFamilyPRefinement(_aux->number(), params);
 }
 
 void
@@ -3370,7 +3370,7 @@ FEProblemBase::addAuxArrayVariable(const std::string & var_name,
   if (_displaced_problem)
     _displaced_problem->addAuxVariable("ArrayMooseVariable", var_name, params);
 
-  markFamilyPRefinement(params);
+  markFamilyPRefinement(_aux->number(), params);
 }
 
 void

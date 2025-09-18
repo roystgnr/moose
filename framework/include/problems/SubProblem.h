@@ -1037,7 +1037,7 @@ protected:
    * Mark a variable family for either disabling or enabling p-refinement with valid parameters of a
    * variable
    */
-  void markFamilyPRefinement(const InputParameters & params);
+  void markFamilyPRefinement(unsigned int sysnum, const InputParameters & params);
 
   /// The currently declared tags
   std::map<TagName, TagID> _matrix_tag_name_to_tag_id;
@@ -1206,8 +1206,9 @@ private:
   /// Whether p-refinement has been requested at any point during the simulation
   bool _have_p_refinement;
 
-  /// Indicate whether a family is disabled for p-refinement
-  std::unordered_map<FEFamily, bool> _family_for_p_refinement;
+  /// Indicate whether a family is disabled for p-refinement on a
+  /// given system index
+  std::unordered_map<std::pair<unsigned int, FEFamily>, bool> _family_for_p_refinement;
   /// The set of variable families by default disable p-refinement
   static const std::unordered_set<FEFamily> _default_families_without_p_refinement;
 
