@@ -12,6 +12,7 @@
 #include "MooseVariable.h"
 #include "Registry.h"
 
+#include "libmesh/libmesh_common.h"
 #include "libmesh/string_to_enum.h"
 
 using namespace libMesh;
@@ -60,12 +61,16 @@ mooseErrorRaw(std::string msg,
   // Atomic that will be set as soon as any thread hits this method
   static std::atomic_flag aborting = ATOMIC_FLAG_INIT;
 
+  // Per-thread bool that will avoid us getting stuck in pause() if one
+  // thread hits this method twice.
+  thread_local static bool this_thread_aborting = false;
+
   // This branch will be hit after another thread has already set the atomic.
   // MPI_Abort, despite its name, does not behave like std::abort but instead
   // calls exit handlers and destroys statics. So we don't want to touch
   // anything static at this point. We'll just wait until the winning thread
   // has incurred program exit
-  if (aborting.test_and_set(std::memory_order_acq_rel))
+  if (aborting.test_and_set(std::memory_order_acq_rel) && !this_thread_aborting)
   {
     // Waiting for the other thread(s), not burning CPU
     for (;;)
@@ -76,6 +81,15 @@ mooseErrorRaw(std::string msg,
   // threads wait for us to exit (via MOOSE_ABORT)
   else
   {
+    // No, really, terminate. libmesh_terminate() may throw an
+    // exception, and if we catch that exception (or a bad_alloc, or
+    // anything thrown) and mooseError because we didn't understand
+    // it, we just want to continue up the stack.
+    if (this_thread_aborting)
+      libmesh_terminate();
+
+    this_thread_aborting = true;
+
     // Output the message if there is one, but flush it without the trace
     // as trace retrieval can be slow in some circumstances and we want to
     // get the error message out ASAP
@@ -115,7 +129,7 @@ mooseErrorRaw(std::string msg,
     if (libMesh::global_n_processors() > 1)
       libMesh::write_traceout();
 
-    MOOSE_ABORT;
+    libmesh_terminate();
   }
 }
 
