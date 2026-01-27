@@ -1478,9 +1478,19 @@ RayTracingStudy::verifyUniqueRayIDs(const std::vector<std::shared_ptr<Ray>>::con
     Parallel::push_parallel_vector_data(_communicator, send_ids, check_ids);
 
     bool found_error = (error_string != "");
-    _communicator.max(found_error);
+    unsigned int rank = 0;
+    _communicator.maxloc(found_error, rank);
     if (found_error)
-      mooseError(error_string);
+    {
+      // Print as many different errors as we can, but make sure at
+      // least some error string gets through before an MPI_Abort can
+      // outrace the rest
+      std::string my_error_string = error_string;
+      _communicator.broadcast(error_string, rank);
+      if (my_error_string == "")
+        my_error_string = error_string;
+      mooseError(my_error_string);
+    }
   }
 }
 
