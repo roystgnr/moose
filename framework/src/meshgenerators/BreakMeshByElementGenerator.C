@@ -176,6 +176,11 @@ BreakMeshByElementGenerator::createInterface(MeshBase & mesh,
   {
     BoundaryInfo & boundary_info = mesh.get_boundary_info();
 
+    // libMesh should only need the boundary_info prepared to call
+    // get_global_boundary_ids(), but still asserts too much there, so
+    // just prepare anything that isn't.
+    mesh.complete_preparation();
+
     const auto & existing_boundary_ids = boundary_info.get_global_boundary_ids();
     const boundary_id_type interface_id =
         existing_boundary_ids.empty() ? 0 : *existing_boundary_ids.rbegin() + 1;
