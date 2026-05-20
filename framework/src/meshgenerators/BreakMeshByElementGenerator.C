@@ -176,7 +176,7 @@ BreakMeshByElementGenerator::createInterface(MeshBase & mesh,
   {
     BoundaryInfo & boundary_info = mesh.get_boundary_info();
 
-    const auto & existing_boundary_ids = boundary_info.get_boundary_ids();
+    const auto & existing_boundary_ids = boundary_info.get_global_boundary_ids();
     const boundary_id_type interface_id =
         existing_boundary_ids.empty() ? 0 : *existing_boundary_ids.rbegin() + 1;
     boundary_info.sideset_name(interface_id) = _interface_name;
