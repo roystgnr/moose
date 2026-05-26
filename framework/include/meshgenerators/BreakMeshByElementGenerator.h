@@ -38,7 +38,12 @@ protected:
   void duplicateNodes(std::unique_ptr<MeshBase> & mesh,
                       const NodeToElemMapType & node_to_elem_map) const;
 
-  void duplicateNode(std::unique_ptr<MeshBase> & mesh, Elem * elem, const Node * node) const;
+  void duplicateNode(std::unique_ptr<MeshBase> & mesh,
+                     Elem * elem,
+                     const Node * node,
+                     unsigned int copy_num,
+                     dof_id_type max_node_id,
+                     dof_id_type max_unique_id) const;
 
   void createInterface(MeshBase & mesh, const NodeToElemMapType & node_to_elem_map) const;
 

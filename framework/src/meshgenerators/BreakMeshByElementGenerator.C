@@ -119,6 +119,65 @@ BreakMeshByElementGenerator::buildSubdomainRestrictedNodeToElemMap(
     }
   }
 
+  // If we aren't serial, we may not see every element connected to
+  // every node we see.  We don't need to see every such element, but
+  // we do need to know they exist so we get our numbering right.
+  // We'll push our numbers to them first, then query the unioned
+  // numbers second.
+  if (!mesh->is_serial())
+  {
+    std::map<processor_id_type, std::vector<std::pair<dof_id_type, std::vector<dof_id_type>>>>
+        submaps_to_push;
+    std::map<processor_id_type, std::vector<dof_id_type>> nodes_to_query;
+    const processor_id_type my_pid = mesh->processor_id();
+    for (const auto & [node_id, connected_elem_ids] : node_to_elem_map)
+    {
+      const processor_id_type node_pid = mesh->node_ref(node_id).processor_id();
+      if (node_pid == my_pid)
+        continue;
+      submaps_to_push[node_pid].push_back(std::make_pair(
+          node_id, std::vector<dof_id_type>(connected_elem_ids.begin(), connected_elem_ids.end())));
+      nodes_to_query[node_pid].push_back(node_id);
+    }
+
+    auto collect_functor =
+        [&node_to_elem_map](
+            processor_id_type,
+            const std::vector<std::pair<dof_id_type, std::vector<dof_id_type>>> & incoming_submap)
+    {
+      for (const auto & [node_id, connected_elem_ids] : incoming_submap)
+        node_to_elem_map[node_id].insert(connected_elem_ids.begin(), connected_elem_ids.end());
+    };
+
+    Parallel::push_parallel_vector_data(mesh->comm(), submaps_to_push, collect_functor);
+
+    auto gather_functor = [&node_to_elem_map](processor_id_type,
+                                              const std::vector<dof_id_type> & nodes,
+                                              std::vector<std::vector<dof_id_type>> & data)
+    {
+      const std::size_t query_size = nodes.size();
+
+      data.resize(query_size);
+      for (auto i : make_range(query_size))
+      {
+        auto & elems = libmesh_map_find(node_to_elem_map, nodes[i]);
+        data[i].insert(data[i].end(), elems.begin(), elems.end());
+      }
+    };
+
+    auto action_functor = [&node_to_elem_map](processor_id_type,
+                                              const std::vector<dof_id_type> & nodes,
+                                              const std::vector<std::vector<dof_id_type>> & data)
+    {
+      for (auto i : make_range(nodes.size()))
+        node_to_elem_map[nodes[i]].insert(data[i].begin(), data[i].end());
+    };
+
+    std::vector<dof_id_type> * data_ex = nullptr;
+    Parallel::pull_parallel_vector_data(
+        mesh->comm(), nodes_to_query, gather_functor, action_functor, data_ex);
+  }
+
   return node_to_elem_map;
 }
 
@@ -126,26 +185,49 @@ void
 BreakMeshByElementGenerator::duplicateNodes(std::unique_ptr<MeshBase> & mesh,
                                             const NodeToElemMapType & node_to_elem_map) const
 {
+  // If we're not doing this replicated, we need to manually set new
+  // node ids and unique_ids.  Let's figure out what our offsets
+  // should be.
+  if (!mesh->preparation().has_synched_id_counts)
+    mesh->update_parallel_id_counts();
+  const dof_id_type max_node_id = mesh->max_node_id();
+  const dof_id_type max_unique_id = mesh->parallel_max_unique_id();
+
+  std::size_t max_elems_per_node = 0;
+
   for (const auto & [node_id, connected_elem_ids] : node_to_elem_map)
+  {
+    max_elems_per_node = std::max(max_elems_per_node, connected_elem_ids.size());
+    unsigned int copy_num = 0;
     for (auto & connected_elem_id : connected_elem_ids)
-      if (connected_elem_id != *connected_elem_ids.begin())
-        duplicateNode(mesh, mesh->elem_ptr(connected_elem_id), mesh->node_ptr(node_id));
+    {
+      Elem * elem = mesh->query_elem_ptr(connected_elem_id);
+      if (connected_elem_id != *connected_elem_ids.begin() && elem)
+        duplicateNode(mesh, elem, mesh->node_ptr(node_id), copy_num, max_node_id, max_unique_id);
+      ++copy_num;
+    }
+  }
+
+  mesh->set_next_unique_id(max_unique_id * max_elems_per_node);
+
+  // We'll want to renumber and we'll need to sync id counts later.
+  mesh->unset_has_synched_id_counts();
 }
 
 void
 BreakMeshByElementGenerator::duplicateNode(std::unique_ptr<MeshBase> & mesh,
                                            Elem * elem,
-                                           const Node * node) const
+                                           const Node * node,
+                                           unsigned int copy_num,
+                                           dof_id_type max_node_id,
+                                           dof_id_type max_unique_id) const
 {
   std::unique_ptr<Node> new_node = Node::build(*node, Node::invalid_id);
   new_node->processor_id() = elem->processor_id();
+  new_node->set_id(max_node_id * copy_num + node->id());
+  new_node->set_unique_id(max_unique_id * copy_num + node->unique_id());
   Node * added_node = mesh->add_node(std::move(new_node));
-  for (const auto j : elem->node_index_range())
-    if (elem->node_id(j) == node->id())
-    {
-      elem->set_node(j, added_node);
-      break;
-    }
+  elem->set_node(elem->get_node_index(node), added_node);
 
   // Add boundary info to the new node
   BoundaryInfo & boundary_info = mesh->get_boundary_info();
